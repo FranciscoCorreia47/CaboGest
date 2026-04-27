@@ -1,5 +1,7 @@
-CREATE USER cabogest IDENTIFIED BY 'c4b0_g3st#' WITH caching_sha2_password;
+CREATE USER 'cabogest'@'%' IDENTIFIED BY 'c4b0_g3st#' WITH caching_sha2_password;
 CREATE SCHEMA cabogest_db;
+
+USE cabogest_db;
 
 CREATE TABLE rooms (
   id INT AUTO_INCREMENT,
@@ -51,3 +53,6 @@ CREATE TABLE Users (
   password VARCHAR(32) NOT NULL,
   PRIMARY KEY (id)
 );
+
+GRANT ALL PRIVILEGES ON cabogest_db.* TO 'cabogest'@'%';
+FLUSH PRIVILEGES;
