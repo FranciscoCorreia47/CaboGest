@@ -44,7 +44,7 @@ CREATE TABLE reservations (
   INDEX idx_e_date (end_date)
 );
 
-CREATE TABLE Users (
+CREATE TABLE users (
   id INT AUTO_INCREMENT,
   f_name VARCHAR(16) NOT NULL,
   l_name VARCHAR(16) NOT NULL,
