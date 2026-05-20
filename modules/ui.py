@@ -1,0 +1,743 @@
+"""
+CaboGest — Sistema de Gestão Hoteleira
+Desenvolvido com Tkinter (Python stdlib)
+"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox, simpledialog
+from datetime import date, datetime
+import random
+
+
+# ─────────────────────────────────────────────
+#  DADOS EM MEMÓRIA (substituir por BD real)
+# ─────────────────────────────────────────────
+QUARTOS = {
+    101: {
+        "tipo": "Single",
+        "preco": 50,
+        "status": "Disponivel"
+    }
+}
+
+TARIFAS = {
+    "Single":  {"Baixa": 40,  "Média": 50,  "Alta": 70},
+    "Double":  {"Baixa": 65,  "Média": 80,  "Alta": 110},
+    "Suite":   {"Baixa": 120, "Média": 150, "Alta": 200},
+}
+
+RESERVAS = []  # lista de dicts
+
+# ─────────────────────────────────────────────
+#  PALETA / CONSTANTES VISUAIS
+# ─────────────────────────────────────────────
+BG       = "#FFFFFF"
+SIDEBAR  = "#F5F5F5"
+BORDER   = "#1A1A1A"
+ACCENT   = "#1A1A1A"
+TEXT     = "#1A1A1A"
+TEXT2    = "#555555"
+BTN_ACT  = "#1A1A1A"
+BTN_TXT  = "#FFFFFF"
+BTN_HVR  = "#333333"
+GREEN    = "#2E7D32"
+RED      = "#C62828"
+ORANGE   = "#E65100"
+FONT     = ("Helvetica", 10)
+FONT_B   = ("Helvetica", 10, "bold")
+FONT_H   = ("Helvetica", 13, "bold")
+FONT_T   = ("Helvetica", 18, "bold")
+
+
+# ═══════════════════════════════════════════
+#  JANELA PRINCIPAL
+# ═══════════════════════════════════════════
+class CaboGest(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("CaboGest")
+        self.geometry("900x580")
+        self.minsize(750, 500)
+        self.configure(bg=BG)
+        self.resizable(True, True)
+
+        self._build_layout()
+        self._show_page("inicio")
+
+    # ── Layout principal ──────────────────
+    def _build_layout(self):
+        # Sidebar
+        self.sidebar = tk.Frame(self, bg=SIDEBAR, bd=0,
+                                highlightbackground=BORDER,
+                                highlightthickness=1, width=220)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        self.sidebar.pack_propagate(False)
+
+        # Área de conteúdo
+        self.content = tk.Frame(self, bg=BG,
+                                highlightbackground=BORDER,
+                                highlightthickness=1)
+        self.content.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self._build_sidebar()
+
+    def _build_sidebar(self):
+        # Logo
+        logo_f = tk.Frame(self.sidebar, bg=SIDEBAR, pady=16)
+        logo_f.pack(fill=tk.X)
+        tk.Label(logo_f, text="CaboGest", font=("Helvetica", 16, "bold"),
+                 bg=SIDEBAR, fg=TEXT).pack()
+        tk.Label(logo_f, text="Sistema de Gestão", font=("Helvetica", 8),
+                 bg=SIDEBAR, fg=TEXT2).pack()
+
+        sep = tk.Frame(self.sidebar, bg=BORDER, height=1)
+        sep.pack(fill=tk.X, padx=10, pady=4)
+
+        # Botões de navegação
+        nav_items = [
+            ("🏠", "Inicio",    "inicio"),
+            ("📅", "Reservas",  "reservas"),
+            ("🛏", "Quartos",   "quartos"),
+            ("💲", "Tarifario", "tarifario"),
+            ("📊", "Relatório", "relatorio"),
+        ]
+
+        self._nav_btns = {}
+        for icon, label, page in nav_items:
+            btn = self._nav_button(self.sidebar, icon, label, page)
+            self._nav_btns[page] = btn
+
+        # Rodapé sidebar: config + ajuda
+        bot = tk.Frame(self.sidebar, bg=SIDEBAR)
+        bot.pack(side=tk.BOTTOM, fill=tk.X, padx=12, pady=12)
+        sep2 = tk.Frame(self.sidebar, bg=BORDER, height=1)
+        sep2.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=2)
+
+        self._icon_btn(bot, "⚙", self._abrir_config).pack(side=tk.LEFT)
+        self._icon_btn(bot, "?", self._abrir_ajuda).pack(side=tk.LEFT, padx=8)
+
+    def _nav_button(self, parent, icon, label, page):
+        frame = tk.Frame(parent, bg=SIDEBAR, cursor="hand2")
+        frame.pack(fill=tk.X, padx=12, pady=3)
+
+        inner = tk.Frame(frame, bg=SIDEBAR, bd=1,
+                         highlightbackground=BORDER, highlightthickness=1,
+                         cursor="hand2")
+        inner.pack(fill=tk.X)
+
+        lbl = tk.Label(inner, text=f"  {icon}  {label}", font=FONT_B,
+                       bg=SIDEBAR, fg=TEXT, anchor="w", padx=8, pady=10,
+                       cursor="hand2")
+        lbl.pack(fill=tk.X)
+
+        def on_click(p=page):
+            self._show_page(p)
+
+        def on_enter(e, f=inner, l=lbl):
+            f.configure(bg=ACCENT)
+            l.configure(bg=ACCENT, fg=BTN_TXT)
+
+        def on_leave(e, f=inner, l=lbl, p=page):
+            if self._active != p:
+                f.configure(bg=SIDEBAR)
+                l.configure(bg=SIDEBAR, fg=TEXT)
+
+        inner.bind("<Button-1>", lambda e: on_click())
+        lbl.bind("<Button-1>",   lambda e: on_click())
+        inner.bind("<Enter>", on_enter)
+        inner.bind("<Leave>", on_leave)
+        lbl.bind("<Enter>",   on_enter)
+        lbl.bind("<Leave>",   on_leave)
+
+        return (inner, lbl)
+
+    def _icon_btn(self, parent, symbol, cmd):
+        btn = tk.Label(parent, text=symbol, font=("Helvetica", 14),
+                       bg=SIDEBAR, fg=TEXT, cursor="hand2",
+                       relief="solid", bd=1, width=3, pady=4)
+        btn.bind("<Button-1>", lambda e: cmd())
+        btn.bind("<Enter>", lambda e: btn.configure(bg=ACCENT, fg=BTN_TXT))
+        btn.bind("<Leave>", lambda e: btn.configure(bg=SIDEBAR, fg=TEXT))
+        return btn
+
+    # ── Navegação ─────────────────────────
+    def _show_page(self, name):
+        self._active = name
+
+        # Reset todos os botões
+        for p, (frame, lbl) in self._nav_btns.items():
+            if p == name:
+                frame.configure(bg=ACCENT)
+                lbl.configure(bg=ACCENT, fg=BTN_TXT)
+            else:
+                frame.configure(bg=SIDEBAR)
+                lbl.configure(bg=SIDEBAR, fg=TEXT)
+
+        # Limpar conteúdo
+        for w in self.content.winfo_children():
+            w.destroy()
+
+        pages = {
+            "inicio":    PaginaInicio,
+            "reservas":  PaginaReservas,
+            "quartos":   PaginaQuartos,
+            "tarifario": PaginaTarifario,
+            "relatorio": PaginaRelatorio,
+        }
+        if name in pages:
+            pages[name](self.content)
+
+    # ── Diálogos especiais ─────────────────
+    def _abrir_config(self):
+        w = tk.Toplevel(self)
+        w.title("Configurações")
+        w.geometry("340x200")
+        w.resizable(False, False)
+        w.configure(bg=BG)
+        tk.Label(w, text="⚙  Configurações", font=FONT_H, bg=BG).pack(pady=20)
+        tk.Label(w, text="Nome do estabelecimento:", font=FONT, bg=BG).pack()
+        e = tk.Entry(w, font=FONT, width=28)
+        e.insert(0, "CaboGest Hotel")
+        e.pack(pady=6)
+        tk.Button(w, text="Guardar", font=FONT_B, bg=ACCENT, fg=BTN_TXT,
+                  relief="flat", padx=20, pady=6,
+                  command=lambda: (messagebox.showinfo("OK", "Configurações guardadas!"), w.destroy())
+                  ).pack(pady=10)
+
+    def _abrir_ajuda(self):
+        msg = (
+            "CaboGest — Sistema de Gestão Hoteleira\n\n"
+            "• Inicio: painel de resumo\n"
+            "• Reservas: gerir todas as reservas\n"
+            "• Quartos: ver e editar quartos\n"
+            "• Tarifario: gerir preços por temporada\n"
+            "• Relatório: estatísticas e exportação\n\n"
+            "Versão 1.0  |  Tkinter + Python"
+        )
+        messagebox.showinfo("Ajuda — CaboGest", msg)
+
+
+# ═══════════════════════════════════════════
+#  HELPERS REUTILIZÁVEIS
+# ═══════════════════════════════════════════
+def titulo(parent, texto):
+    tk.Label(parent, text=texto, font=FONT_T, bg=BG, fg=TEXT,
+             anchor="w").pack(fill=tk.X, padx=24, pady=(20, 4))
+    tk.Frame(parent, bg=BORDER, height=2).pack(fill=tk.X, padx=24, pady=(0, 16))
+
+
+def btn_primario(parent, texto, cmd, **kw):
+    b = tk.Button(parent, text=texto, font=FONT_B, bg=ACCENT, fg=BTN_TXT,
+                  relief="flat", padx=14, pady=7, cursor="hand2",
+                  activebackground=BTN_HVR, activeforeground=BTN_TXT,
+                  command=cmd, **kw)
+    b.bind("<Enter>", lambda e: b.configure(bg=BTN_HVR))
+    b.bind("<Leave>", lambda e: b.configure(bg=ACCENT))
+    return b
+
+
+def btn_perigo(parent, texto, cmd, **kw):
+    b = tk.Button(parent, text=texto, font=FONT_B, bg=RED, fg=BTN_TXT,
+                  relief="flat", padx=14, pady=7, cursor="hand2",
+                  activebackground="#8B0000", activeforeground=BTN_TXT,
+                  command=cmd, **kw)
+    return b
+
+
+def card(parent, **kw):
+    return tk.Frame(parent, bg=BG, bd=1,
+                    highlightbackground="#CCCCCC",
+                    highlightthickness=1, **kw)
+
+
+def stat_card(parent, valor, rotulo, cor=TEXT):
+    f = card(parent, padx=16, pady=12)
+    tk.Label(f, text=str(valor), font=("Helvetica", 26, "bold"),
+             bg=BG, fg=cor).pack()
+    tk.Label(f, text=rotulo, font=("Helvetica", 9),
+             bg=BG, fg=TEXT2).pack()
+    return f
+
+
+# ═══════════════════════════════════════════
+#  PÁGINA: INÍCIO
+# ═══════════════════════════════════════════
+class PaginaInicio(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.pack(fill=tk.BOTH, expand=True)
+        titulo(self, "🏠  Painel de Início")
+        self._stats()
+        self._proximas()
+
+    def _stats(self):
+        f = tk.Frame(self, bg=BG)
+        f.pack(fill=tk.X, padx=24, pady=8)
+
+        disponiveis = sum(1 for q in QUARTOS.values() if q["estado"] == "Disponível")
+        ocupados    = len(QUARTOS) - disponiveis
+        hoje        = sum(1 for r in RESERVAS
+                         if r["checkin"] == date.today().strftime("%d/%m/%Y"))
+
+        receita = sum(r.get("total", 0) for r in RESERVAS)
+
+        cards = [
+            (len(QUARTOS), "Total de Quartos", TEXT),
+            (disponiveis,  "Disponíveis",      GREEN),
+            (ocupados,     "Ocupados",          RED),
+            (f"{receita}€","Receita Total",     ORANGE),
+        ]
+        for v, r, c in cards:
+            s = stat_card(f, v, r, c)
+            s.pack(side=tk.LEFT, padx=6, pady=4, fill=tk.X, expand=True)
+
+    def _proximas(self):
+        tk.Label(self, text="Reservas Recentes", font=FONT_B,
+                 bg=BG, fg=TEXT2, anchor="w").pack(fill=tk.X, padx=24, pady=(12, 4))
+
+        cols = ("ID", "Hóspede", "Quarto", "Check-in", "Check-out", "Total")
+        tree = ttk.Treeview(self, columns=cols, show="headings", height=8)
+        for c in cols:
+            tree.heading(c, text=c)
+            tree.column(c, width=100, anchor="center")
+        tree.column("Hóspede", width=160)
+
+        for r in RESERVAS[-10:][::-1]:
+            tree.insert("", tk.END, values=(
+                r["id"], r["hospede"], r["quarto"],
+                r["checkin"], r["checkout"], f"{r.get('total',0)}€"
+            ))
+
+        sb = ttk.Scrollbar(self, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=sb.set)
+        tree.pack(fill=tk.BOTH, expand=True, padx=24, pady=4)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+
+
+# ═══════════════════════════════════════════
+#  PÁGINA: RESERVAS
+# ═══════════════════════════════════════════
+class PaginaReservas(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.pack(fill=tk.BOTH, expand=True)
+        titulo(self, "📅  Gestão de Reservas")
+
+        bar = tk.Frame(self, bg=BG)
+        bar.pack(fill=tk.X, padx=24, pady=(0, 8))
+        btn_primario(bar, "+ Nova Reserva", self._nova).pack(side=tk.LEFT, padx=(0, 8))
+        btn_perigo(bar, "Cancelar Selecionada", self._cancelar).pack(side=tk.LEFT)
+
+        # Pesquisa
+        tk.Label(bar, text="Pesquisar:", font=FONT, bg=BG).pack(side=tk.LEFT, padx=(20, 4))
+        self.pesq = tk.StringVar()
+        self.pesq.trace_add("write", lambda *a: self._filtrar())
+        tk.Entry(bar, textvariable=self.pesq, font=FONT, width=18,
+                 relief="solid", bd=1).pack(side=tk.LEFT)
+
+        self._build_tree()
+        self._carregar()
+
+    def _build_tree(self):
+        cols = ("ID", "Hóspede", "Quarto", "Check-in", "Check-out", "Noites", "Total", "Estado")
+        self.tree = ttk.Treeview(self, columns=cols, show="headings", height=16)
+        widths = [40, 160, 70, 90, 90, 60, 70, 90]
+        for c, w in zip(cols, widths):
+            self.tree.heading(c, text=c, command=lambda _c=c: self._ordenar(_c))
+            self.tree.column(c, width=w, anchor="center")
+        self.tree.column("Hóspede", anchor="w")
+
+        sb = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.pack(fill=tk.BOTH, expand=True, padx=24, pady=4)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.tree.tag_configure("ativa",     background="#E8F5E9")
+        self.tree.tag_configure("cancelada", background="#FFEBEE", foreground="#999")
+
+    def _carregar(self, dados=None):
+        self.tree.delete(*self.tree.get_children())
+        lista = dados if dados is not None else RESERVAS
+        for r in lista:
+            tag = "cancelada" if r.get("estado") == "Cancelada" else "ativa"
+            self.tree.insert("", tk.END, iid=r["id"], tags=(tag,), values=(
+                r["id"], r["hospede"], r["quarto"],
+                r["checkin"], r["checkout"],
+                r.get("noites", "-"), f"{r.get('total',0)}€",
+                r.get("estado", "Ativa")
+            ))
+
+    def _filtrar(self):
+        q = self.pesq.get().lower()
+        filtrado = [r for r in RESERVAS
+                    if q in r["hospede"].lower() or q in str(r["quarto"])]
+        self._carregar(filtrado)
+
+    def _ordenar(self, col):
+        key_map = {"ID": "id", "Hóspede": "hospede", "Quarto": "quarto",
+                   "Check-in": "checkin", "Total": "total"}
+        k = key_map.get(col, col.lower())
+        try:
+            RESERVAS.sort(key=lambda r: r.get(k, ""))
+        except Exception:
+            pass
+        self._carregar()
+
+    def _nova(self):
+        JanelaNovaReserva(self, self._carregar)
+
+    def _cancelar(self):
+        sel = self.tree.focus()
+        if not sel:
+            messagebox.showwarning("Aviso", "Seleciona uma reserva primeiro.")
+            return
+        rid = int(sel)
+        for r in RESERVAS:
+            if r["id"] == rid:
+                if r.get("estado") == "Cancelada":
+                    messagebox.showinfo("Info", "Reserva já cancelada.")
+                    return
+                if messagebox.askyesno("Cancelar", f"Cancelar reserva #{rid}?"):
+                    r["estado"] = "Cancelada"
+                    # Libertar quarto
+                    if r["quarto"] in QUARTOS:
+                        QUARTOS[r["quarto"]]["estado"] = "Disponível"
+                    self._carregar()
+                return
+
+
+# ── Janela: Nova Reserva ──────────────────
+class JanelaNovaReserva(tk.Toplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+        self.callback = callback
+        self.title("Nova Reserva")
+        self.geometry("420x380")
+        self.resizable(False, False)
+        self.configure(bg=BG)
+        self.grab_set()
+
+        tk.Label(self, text="Nova Reserva", font=FONT_H, bg=BG).pack(pady=14)
+
+        form = tk.Frame(self, bg=BG)
+        form.pack(padx=30, fill=tk.X)
+
+        campos = [
+            ("Hóspede:",    "hospede",   "entry"),
+            ("Quarto nº:",  "quarto",    "combo"),
+            ("Check-in\n(dd/mm/aaaa):", "checkin",  "entry"),
+            ("Check-out\n(dd/mm/aaaa):","checkout", "entry"),
+        ]
+
+        self.vars = {}
+        for i, (label, key, tipo) in enumerate(campos):
+            tk.Label(form, text=label, font=FONT, bg=BG, anchor="e",
+                     width=16).grid(row=i, column=0, pady=6, sticky="e")
+            if tipo == "entry":
+                v = tk.StringVar()
+                tk.Entry(form, textvariable=v, font=FONT, width=20,
+                         relief="solid", bd=1).grid(row=i, column=1, padx=8, sticky="w")
+            else:
+                v = tk.StringVar()
+                disponiveis = [str(n) for n, q in QUARTOS.items()
+                               if q["estado"] == "Disponível"]
+                cb = ttk.Combobox(form, textvariable=v, values=disponiveis,
+                                  font=FONT, width=18, state="readonly")
+                cb.grid(row=i, column=1, padx=8, sticky="w")
+            self.vars[key] = v
+
+        btn_primario(self, "✔  Confirmar Reserva", self._confirmar).pack(pady=18)
+
+    def _confirmar(self):
+        h  = self.vars["hospede"].get().strip()
+        q  = self.vars["quarto"].get().strip()
+        ci = self.vars["checkin"].get().strip()
+        co = self.vars["checkout"].get().strip()
+
+        if not all([h, q, ci, co]):
+            messagebox.showwarning("Campos em falta", "Preenche todos os campos.", parent=self)
+            return
+        try:
+            q = int(q)
+            d_in  = datetime.strptime(ci, "%d/%m/%Y").date()
+            d_out = datetime.strptime(co, "%d/%m/%Y").date()
+            noites = (d_out - d_in).days
+            if noites <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Erro", "Datas inválidas ou check-out antes do check-in.", parent=self)
+            return
+
+        preco  = QUARTOS[q]["preco"]
+        total  = preco * noites
+        rid    = len(RESERVAS) + 1
+
+        RESERVAS.append({
+            "id": rid, "hospede": h, "quarto": q,
+            "checkin": ci, "checkout": co,
+            "noites": noites, "total": total, "estado": "Ativa"
+        })
+        QUARTOS[q]["estado"] = "Ocupado"
+
+        messagebox.showinfo("Reserva criada",
+                            f"Reserva #{rid} criada!\n{noites} noite(s) × {preco}€ = {total}€",
+                            parent=self)
+        self.callback()
+        self.destroy()
+
+
+# ═══════════════════════════════════════════
+#  PÁGINA: QUARTOS
+# ═══════════════════════════════════════════
+class PaginaQuartos(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.pack(fill=tk.BOTH, expand=True)
+        titulo(self, "🛏  Gestão de Quartos")
+
+        bar = tk.Frame(self, bg=BG)
+        bar.pack(fill=tk.X, padx=24, pady=(0, 8))
+        btn_primario(bar, "✎ Editar Selecionado", self._editar).pack(side=tk.LEFT, padx=(0, 8))
+        btn_primario(bar, "↻ Atualizar Estado", self._toggle_estado).pack(side=tk.LEFT)
+
+        self._build_tree()
+        self._carregar()
+
+    def _build_tree(self):
+        cols = ("Nº", "Tipo", "Preço/noite", "Estado")
+        self.tree = ttk.Treeview(self, columns=cols, show="headings", height=18)
+        for c in cols:
+            self.tree.heading(c, text=c)
+            self.tree.column(c, width=160, anchor="center")
+        sb = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.pack(fill=tk.BOTH, expand=True, padx=24, pady=4)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.tree.tag_configure("Disponível", background="#E8F5E9", foreground=GREEN)
+        self.tree.tag_configure("Ocupado",    background="#FFEBEE", foreground=RED)
+        self.tree.tag_configure("Manutenção", background="#FFF8E1", foreground=ORANGE)
+
+    def _carregar(self):
+        self.tree.delete(*self.tree.get_children())
+        for num, q in sorted(QUARTOS.items()):
+            self.tree.insert("", tk.END, iid=num, tags=(q["estado"],), values=(
+                num, q["tipo"], f"{q['preco']}€", q["estado"]
+            ))
+
+    def _editar(self):
+        sel = self.tree.focus()
+        if not sel:
+            messagebox.showwarning("Aviso", "Seleciona um quarto."); return
+        num = int(sel)
+        q   = QUARTOS[num]
+        JanelaEditarQuarto(self, num, q, self._carregar)
+
+    def _toggle_estado(self):
+        sel = self.tree.focus()
+        if not sel:
+            messagebox.showwarning("Aviso", "Seleciona um quarto."); return
+        num = int(sel)
+        estados = ["Disponível", "Ocupado", "Manutenção"]
+        atual   = QUARTOS[num]["estado"]
+        prox    = estados[(estados.index(atual) + 1) % len(estados)]
+        QUARTOS[num]["estado"] = prox
+        self._carregar()
+
+
+class JanelaEditarQuarto(tk.Toplevel):
+    def __init__(self, parent, num, quarto, callback):
+        super().__init__(parent)
+        self.callback = callback
+        self.num      = num
+        self.title(f"Editar Quarto {num}")
+        self.geometry("340x240")
+        self.resizable(False, False)
+        self.configure(bg=BG)
+        self.grab_set()
+
+        tk.Label(self, text=f"Quarto {num}", font=FONT_H, bg=BG).pack(pady=14)
+
+        form = tk.Frame(self, bg=BG)
+        form.pack(padx=24, fill=tk.X)
+
+        self.tipo  = tk.StringVar(value=quarto["tipo"])
+        self.preco = tk.StringVar(value=str(quarto["preco"]))
+        self.estado= tk.StringVar(value=quarto["estado"])
+
+        for i, (lbl, var, opts) in enumerate([
+            ("Tipo:",  self.tipo,   ["Single", "Double", "Suite"]),
+            ("Estado:",self.estado, ["Disponível", "Ocupado", "Manutenção"]),
+        ]):
+            tk.Label(form, text=lbl, font=FONT, bg=BG, width=10, anchor="e").grid(row=i, column=0, pady=6)
+            ttk.Combobox(form, textvariable=var, values=opts,
+                         state="readonly", width=18).grid(row=i, column=1, padx=8)
+
+        tk.Label(form, text="Preço (€):", font=FONT, bg=BG, width=10, anchor="e").grid(row=2, column=0, pady=6)
+        tk.Entry(form, textvariable=self.preco, font=FONT, width=20,
+                 relief="solid", bd=1).grid(row=2, column=1, padx=8)
+
+        btn_primario(self, "Guardar", self._guardar).pack(pady=14)
+
+    def _guardar(self):
+        try:
+            p = int(self.preco.get())
+        except ValueError:
+            messagebox.showerror("Erro", "Preço inválido.", parent=self); return
+        QUARTOS[self.num]["tipo"]   = self.tipo.get()
+        QUARTOS[self.num]["preco"]  = p
+        QUARTOS[self.num]["estado"] = self.estado.get()
+        self.callback()
+        self.destroy()
+
+
+# ═══════════════════════════════════════════
+#  PÁGINA: TARIFÁRIO
+# ═══════════════════════════════════════════
+class PaginaTarifario(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.pack(fill=tk.BOTH, expand=True)
+        titulo(self, "💲  Tarifário por Temporada")
+        self._build()
+
+    def _build(self):
+        # Tabela visual
+        header = tk.Frame(self, bg=ACCENT)
+        header.pack(fill=tk.X, padx=24, pady=(0, 1))
+        for h, w in [("Tipo de Quarto", 200), ("Época Baixa", 140),
+                     ("Época Média", 140), ("Época Alta", 140), ("", 60)]:
+            tk.Label(header, text=h, font=FONT_B, bg=ACCENT, fg=BTN_TXT,
+                     width=w//8, anchor="center", pady=8).pack(side=tk.LEFT, padx=2)
+
+        self.linhas = {}
+        for tipo, precos in TARIFAS.items():
+            row = tk.Frame(self, bg=BG, bd=0,
+                           highlightbackground="#DDDDDD", highlightthickness=1)
+            row.pack(fill=tk.X, padx=24, pady=1)
+
+            tk.Label(row, text=tipo, font=FONT_B, bg=BG, width=22,
+                     anchor="w", padx=12, pady=10).pack(side=tk.LEFT)
+
+            self.linhas[tipo] = {}
+            for epoca in ["Baixa", "Média", "Alta"]:
+                v = tk.StringVar(value=str(precos[epoca]))
+                e = tk.Entry(row, textvariable=v, font=FONT, width=10,
+                             relief="solid", bd=1, justify="center")
+                e.pack(side=tk.LEFT, padx=12, pady=6)
+                self.linhas[tipo][epoca] = v
+
+            tk.Label(row, text="€/noite", font=("Helvetica", 9),
+                     bg=BG, fg=TEXT2).pack(side=tk.LEFT)
+
+        tk.Frame(self, bg=BG, height=12).pack()
+        btn_primario(self, "💾  Guardar Tarifário", self._guardar).pack(padx=24, anchor="w")
+
+        # Nota
+        tk.Label(self, text="As alterações ao tarifário aplicam-se a novas reservas.",
+                 font=("Helvetica", 9), bg=BG, fg=TEXT2).pack(padx=24, pady=8, anchor="w")
+
+    def _guardar(self):
+        try:
+            for tipo, epocas in self.linhas.items():
+                for epoca, var in epocas.items():
+                    TARIFAS[tipo][epoca] = int(var.get())
+                    # Sincronizar preço padrão do quarto
+                    for q in QUARTOS.values():
+                        if q["tipo"] == tipo:
+                            q["preco"] = TARIFAS[tipo]["Média"]
+        except ValueError:
+            messagebox.showerror("Erro", "Todos os preços devem ser números inteiros.")
+            return
+        messagebox.showinfo("OK", "Tarifário guardado com sucesso!")
+
+
+# ═══════════════════════════════════════════
+#  PÁGINA: RELATÓRIO
+# ═══════════════════════════════════════════
+class PaginaRelatorio(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.pack(fill=tk.BOTH, expand=True)
+        titulo(self, "📊  Relatório de Ocupação")
+        self._stats()
+        self._grafico()
+        btn_primario(self, "📋  Exportar (consola)", self._exportar).pack(padx=24, anchor="w", pady=8)
+
+    def _stats(self):
+        f = tk.Frame(self, bg=BG)
+        f.pack(fill=tk.X, padx=24, pady=4)
+
+        total_res  = len(RESERVAS)
+        ativas     = sum(1 for r in RESERVAS if r.get("estado") != "Cancelada")
+        canceladas = total_res - ativas
+        receita    = sum(r.get("total", 0) for r in RESERVAS if r.get("estado") != "Cancelada")
+        ocup_pct   = round((sum(1 for q in QUARTOS.values() if q["estado"] == "Ocupado")
+                            / len(QUARTOS)) * 100) if QUARTOS else 0
+
+        cards = [
+            (total_res,  "Total Reservas", TEXT),
+            (ativas,     "Reservas Ativas", GREEN),
+            (canceladas, "Canceladas",      RED),
+            (f"{receita}€", "Receita",     ORANGE),
+            (f"{ocup_pct}%","Ocupação",    "#1565C0"),
+        ]
+        for v, r, c in cards:
+            s = stat_card(f, v, r, c)
+            s.pack(side=tk.LEFT, padx=4, pady=4, fill=tk.X, expand=True)
+
+    def _grafico(self):
+        tk.Label(self, text="Ocupação por tipo de quarto", font=FONT_B,
+                 bg=BG, fg=TEXT2, anchor="w").pack(fill=tk.X, padx=24, pady=(12, 4))
+
+        canvas = tk.Canvas(self, bg=BG, height=120, highlightthickness=0)
+        canvas.pack(fill=tk.X, padx=24)
+
+        tipos = ["Single", "Double", "Suite"]
+        cores = [ACCENT, "#555", "#888"]
+        for i, (tipo, cor) in enumerate(zip(tipos, cores)):
+            total   = sum(1 for q in QUARTOS.values() if q["tipo"] == tipo)
+            ocup    = sum(1 for q in QUARTOS.values() if q["tipo"] == tipo and q["estado"] == "Ocupado")
+            pct     = (ocup / total * 100) if total else 0
+            x0, y0  = 40 + i * 200, 20
+            larg, alt = 140, 80
+            canvas.create_rectangle(x0, y0 + alt * (1 - pct/100), x0 + larg, y0 + alt,
+                                     fill=cor, outline="")
+            canvas.create_rectangle(x0, y0, x0 + larg, y0 + alt,
+                                     fill="", outline="#CCCCCC")
+            canvas.create_text(x0 + larg//2, y0 + alt + 14,
+                               text=f"{tipo}  {ocup}/{total}", font=("Helvetica", 9), fill=TEXT2)
+            canvas.create_text(x0 + larg//2, y0 + alt * (1 - pct/100) - 6,
+                               text=f"{round(pct)}%", font=("Helvetica", 9, "bold"), fill=TEXT)
+
+    def _exportar(self):
+        print("\n" + "="*50)
+        print("RELATÓRIO CaboGest —", datetime.now().strftime("%d/%m/%Y %H:%M"))
+        print("="*50)
+        for r in RESERVAS:
+            est = r.get("estado", "Ativa")
+            print(f"#{r['id']:03d} | {r['hospede']:<20} | Q{r['quarto']} | "
+                  f"{r['checkin']}→{r['checkout']} | {r.get('total',0)}€ | {est}")
+        print("="*50)
+        messagebox.showinfo("Exportado", "Relatório exportado para a consola/terminal.")
+
+
+# ═══════════════════════════════════════════
+#  ENTRADA
+# ═══════════════════════════════════════════
+if __name__ == "__main__":
+    # Dados de exemplo para demonstração
+    RESERVAS.extend([
+        {"id": 1, "hospede": "Maria Santos",    "quarto": 101, "checkin": "01/05/2026",
+         "checkout": "04/05/2026", "noites": 3, "total": 150, "estado": "Ativa"},
+        {"id": 2, "hospede": "João Ferreira",   "quarto": 102, "checkin": "02/05/2026",
+         "checkout": "05/05/2026", "noites": 3, "total": 240, "estado": "Ativa"},
+        {"id": 3, "hospede": "Ana Rodrigues",   "quarto": 103, "checkin": "28/04/2026",
+         "checkout": "02/05/2026", "noites": 4, "total": 600, "estado": "Cancelada"},
+        {"id": 4, "hospede": "Carlos Monteiro", "quarto": 201, "checkin": "03/05/2026",
+         "checkout": "06/05/2026", "noites": 3, "total": 240, "estado": "Ativa"},
+    ])
+    QUARTOS[101]["estado"] = "Ocupado"
+
+    app = CaboGest()
+    app.mainloop()
