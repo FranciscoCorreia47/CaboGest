@@ -30,7 +30,7 @@ CREATE TABLE clients (
 CREATE TABLE reservations (
   id INT AUTO_INCREMENT,
   client_id INT NOT NULL,
-  room_id INT NOT NULL,
+  room_id INT NOT NULL, 
   start_date DATETIME NOT NULL DEFAULT NOW(),
   end_date DATETIME NOT NULL,
   status ENUM("checked_in", "checked_out", "transfered", "canceled") NOT NULL,
