@@ -1,4 +1,4 @@
-CREATE USER 'cabogest'@'%' IDENTIFIED BY 'c4b0_g3st#' WITH caching_sha2_password;
+DROP SCHEMA IF EXISTS cabogest_db;
 CREATE SCHEMA cabogest_db;
 
 USE cabogest_db;

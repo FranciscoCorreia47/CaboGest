@@ -1,4 +1,4 @@
-from db_config import connection, cursor
+from modules.db_config import connection, cursor
 from datetime import date, time, datetime, timedelta
 
 class Rooms:
@@ -110,23 +110,25 @@ class Users(People):
 
 
 class Reservations:
-    def __init__(self, id, start_date: datetime, end_date: datetime, status: str, total_price: float):
+    def __init__(self, id, client_id: int, room_id: int, start_date: datetime, end_date: datetime, status: str, total_price: float):
         self.__id = id
         self.start_date = start_date
         self.end_date = end_date
         self.status = status
         self.total_price = total_price
+        self.__client_id = client_id
+        self.__room_id = room_id
 
     @property
     def id(self):
         return self.__id
     
-    def add_reservation(client: Clients, room: Rooms, start_date: datetime, end_date: datetime):
+    def add_reservation(self, start_date: datetime, end_date: datetime):
         con = connection
         curs = cursor
 
         query = "INSERT INTO reservations(client_id, room_id, start_date, end_date) VALUES (%d, %d, %s, %s)"
-        params = (client.id(), room.id(), start_date.strftime('%Y-%m-%d %H:%M:%S'), end_date.strftime('%Y-%m-%d %H:%M:%S'))
+        params = (self.__client_id, self.__room_id, start_date.strftime('%Y-%m-%d %H:%M:%S'), end_date.strftime('%Y-%m-%d %H:%M:%S'))
         curs.execute(query, params)
         con.commit()
 
