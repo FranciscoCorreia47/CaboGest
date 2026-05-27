@@ -31,6 +31,12 @@ FONT_T   = ("Helvetica", 18, "bold")
 #  DADOS DA APLICAÇÃO
 # ═══════════════════════════════════════════
 
+TARIFS = {
+    "Single":  {"Baixa": 40,  "Média": 50,  "Alta": 70},
+    "Double":  {"Baixa": 65,  "Média": 80,  "Alta": 110},
+    "Suite":   {"Baixa": 120, "Média": 150, "Alta": 200},
+}
+
 rooms_data = utils.get_all('rooms')
 clients_data = utils.get_all('clients')
 reservations_data = utils.get_all('reservations')
