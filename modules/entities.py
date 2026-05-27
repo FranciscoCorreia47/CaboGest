@@ -11,7 +11,6 @@ class Rooms:
         self.__occupied = occupied
         self.description = description
         self.price_per_night = price_per_night
-        self.add_room()
         
     @property
     def id(self):
@@ -25,7 +24,7 @@ class Rooms:
     def category(self, value):
         try:
             if value not in ["Regular", "With View"]:
-                raise ValueError(f"Room Category can only be 'Regular' or 'With View', got {value}"")
+                raise ValueError(f"Room Category can only be 'Regular' or 'With View', got {value}")
             else:
                 self.__category = value
             con = connection
@@ -50,7 +49,7 @@ class Rooms:
     def type(self, value):
         try:
             if value not in ["Suite", "Single"]:
-                raise ValueError(f"Room Type can only be 'Suite' or 'Single', got {value}"")
+                raise ValueError(f"Room Type can only be 'Suite' or 'Single', got {value}")
             else:
                 self.__type = value
             con = connection
@@ -99,7 +98,7 @@ class Rooms:
     @bed_qty.setter
     def bed_qty(self, qnty):
         try:
-            if !(qnty.isdigit()) or qnty <= 0:
+            if not (qnty.isdigit()) or qnty <= 0:
                 raise ValueError(f"Bed quantity must be a number and greater than 0")
             else:
                 self.__bed_qty = qnty
@@ -203,10 +202,10 @@ class People:
     def email(self, value, table: str):
         try:
             pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            if re.fullmatch(pattern, value) == false:
+            if re.fullmatch(pattern, value) == False:
                 raise ValueError(f"The Email must have a correct format")
             else:
-                self._email = email
+                self._email = value
             con = connection
             curs = cursor
     
@@ -282,6 +281,10 @@ class Reservations:
     @property
     def id(self):
         return self.__id
+    
+    @property
+    def room_id(self):
+        return self.__room_id
 
     @property
     def status(self):
@@ -308,7 +311,7 @@ class Reservations:
         except ValueError as e:
             print(e)
             
-    def add_reservation(self, start_date: datetime, end_date: datetime):
+    def add_reservation(self, start_date: datetime, end_date: datetime, room: Rooms):
         try:
             con = connection
             curs = cursor

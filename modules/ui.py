@@ -57,7 +57,7 @@ for u in users_data:
 #  JANELA PRINCIPAL
 # ═══════════════════════════════════════════
 class CaboGest(tk.Tk):
-    def __init__(self, startup_data: dict):
+    def __init__(self):
         super().__init__()
         self.title("CaboGest")
         self.geometry("900x580")
@@ -308,7 +308,7 @@ class PaginaInicio(tk.Frame):
 
         for r in RESERVATIONS[-10:][::-1]:
             tree.insert("", tk.END, values=(
-                r.id(), r.cliend_name(), r.room_id,
+                r.id(), r.client_name(), r.room_id(),
                 r.start_date, r.end_date, f"{r.total_price}€"
             ))
 
@@ -365,28 +365,38 @@ class PaginaReservas(tk.Frame):
         for r in lista:
             tag = "cancelada" if r.status == "canceled" else "ativa"
             self.tree.insert("", tk.END, iid=r.id(), tags=(tag,), values=(
-                r.id(), r.client_name(), r.room_id,
+                r.id(), r.client_name(), r.room_id(),
                 r.start_date, r.end_date,
                 (r.start_date - r.end_date).days, f"{r.total_price}€",
-                r.status
+                r.status()
             ))
 
     def _filtrar(self):
         q = self.pesq.get().lower()
         filtrado = [r for r in RESERVATIONS
-                    if q in r.client_name().lower() or q in r.room_id()]
+                    if q in r.client_name().lower() or q in r.room_id]
         self._carregar(filtrado)
 
     def _ordenar(self, col):
-        """key_map = {"ID": "id", "Hóspede": "hospede", "Quarto": "quarto",
-                   "Check-in": "checkin", "Total": "total"}
-        k = key_map.get(col, col.lower())
-        try:
-            RESERVATIONS.sort(key=lambda r: r.get(k, ""))
-        except Exception:
-            pass
-        self._carregar()"""
-        pass
+      # Map the column names directly to a lambda function that reads the object
+      key_map = {
+          "ID": lambda r: r.id,
+          "Hóspede": lambda r: r.get_client_name() or "",
+          "Quarto": lambda r: r.room_id,
+          "Check-in": lambda r: r.start_date,
+          "Total": lambda r: r.total_price
+      }
+      
+      # Fallback to getattr if the column isn't in the map (uses lowercase attribute name)
+      sort_key = key_map.get(col, lambda r: getattr(r, col.lower(), ""))
+      
+      try:
+          # Sort the list in place using the extracted key function
+          RESERVATIONS.sort(key=sort_key)
+      except Exception as e:
+          print(f"Sorting error: {e}") # Temporarily print error for debugging
+          
+      self._carregar()
 
     def _nova(self):
         JanelaNovaReserva(self, self._carregar)
@@ -525,9 +535,9 @@ class PaginaQuartos(tk.Frame):
 
     def _carregar(self):
         self.tree.delete(*self.tree.get_children())
-        for num, q in sorted(ROOMS.items()):
-            self.tree.insert("", tk.END, iid=num, tags=(q["estado"],), values=(
-                num, q["tipo"], f"{q['preco']}€", q["estado"]
+        for num, q in sorted(ROOMS):
+            self.tree.insert("", tk.END, iid=num, tags=(q.occupied,), values=(
+                num, q.type, f"{q.total_price}€", q.occupied
             ))
 
     def _editar(self):
@@ -543,15 +553,15 @@ class PaginaQuartos(tk.Frame):
         if not sel:
             messagebox.showwarning("Aviso", "Seleciona um quarto."); return
         num = int(sel)
-        estados = ["Disponível", "Ocupado", "Manutenção"]
-        atual   = ROOMS[num]["estado"]
-        prox    = estados[(estados.index(atual) + 1) % len(estados)]
-        ROOMS[num]["estado"] = prox
+        estados = ["Disponível", "Ocupado"]
+        atual   = ROOMS[num].occupied
+        prox    = estados[atual]
+        ROOMS[num].occupied = prox
         self._carregar()
 
 
 class JanelaEditarQuarto(tk.Toplevel):
-    def __init__(self, parent, num, quarto, callback):
+    def __init__(self, parent, num, quarto: Rooms, callback):
         super().__init__(parent)
         self.callback = callback
         self.num      = num
@@ -566,9 +576,9 @@ class JanelaEditarQuarto(tk.Toplevel):
         form = tk.Frame(self, bg=BG)
         form.pack(padx=24, fill=tk.X)
 
-        self.tipo  = tk.StringVar(value=quarto["tipo"])
-        self.preco = tk.StringVar(value=str(quarto["preco"]))
-        self.estado= tk.StringVar(value=quarto["estado"])
+        self.tipo  = tk.StringVar(value=quarto.type)
+        self.preco = tk.StringVar(value=str(quarto.price))
+        self.estado= tk.StringVar(value=quarto.occupied)
 
         for i, (lbl, var, opts) in enumerate([
             ("Tipo:",  self.tipo,   ["Single", "Double", "Suite"]),
@@ -589,9 +599,9 @@ class JanelaEditarQuarto(tk.Toplevel):
             p = int(self.preco.get())
         except ValueError:
             messagebox.showerror("Erro", "Preço inválido.", parent=self); return
-        ROOMS[self.num]["tipo"]   = self.tipo.get()
-        ROOMS[self.num]["preco"]  = p
-        ROOMS[self.num]["estado"] = self.estado.get()
+        ROOMS[self.num].type      = self.tipo.get()
+        ROOMS[self.num].price     = p
+        ROOMS[self.num].occupied  = self.estado.get()
         self.callback()
         self.destroy()
 
@@ -674,10 +684,10 @@ class PaginaRelatorio(tk.Frame):
         f.pack(fill=tk.X, padx=24, pady=4)
 
         total_res  = len(RESERVATIONS)
-        ativas     = sum(1 for r in RESERVATIONS if r.get("estado") != "Cancelada")
+        ativas     = sum(1 for r in RESERVATIONS if r.status != "Canceled")
         canceladas = total_res - ativas
-        receita    = sum(r.get("total", 0) for r in RESERVATIONS if r.get("estado") != "Cancelada")
-        ocup_pct   = round((sum(1 for q in ROOMS.values() if q["estado"] == "Ocupado")
+        receita    = sum(r.total_price for r in RESERVATIONS if r.status != "Canceled")
+        ocup_pct   = round((sum(1 for q in ROOMS if q.occupied)
                             / len(ROOMS)) * 100) if ROOMS else 0
 
         cards = [
@@ -701,8 +711,8 @@ class PaginaRelatorio(tk.Frame):
         tipos = ["Single", "Double", "Suite"]
         cores = [ACCENT, "#555", "#888"]
         for i, (tipo, cor) in enumerate(zip(tipos, cores)):
-            total   = sum(1 for q in ROOMS.values() if q["tipo"] == tipo)
-            ocup    = sum(1 for q in ROOMS.values() if q["tipo"] == tipo and q["estado"] == "Ocupado")
+            total   = sum(1 for q in ROOMS.values() if q.type == tipo)
+            ocup    = sum(1 for q in ROOMS.values() if q.type == tipo and q.occupied)
             pct     = (ocup / total * 100) if total else 0
             x0, y0  = 40 + i * 200, 20
             larg, alt = 140, 80
@@ -720,7 +730,7 @@ class PaginaRelatorio(tk.Frame):
         print("RELATÓRIO CaboGest —", datetime.now().strftime("%d/%m/%Y %H:%M"))
         print("="*50)
         for r in ROOMS:
-            est = r.get("estado", "Ativa")
+            est = r.occupied
             print(f"#{r['id']:03d} | {r['hospede']:<20} | Q{r['quarto']} | "
                   f"{r['checkin']}→{r['checkout']} | {r.get('total',0)}€ | {est}")
         print("="*50)
