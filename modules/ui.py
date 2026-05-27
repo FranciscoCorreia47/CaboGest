@@ -444,7 +444,7 @@ class JanelaNovaReserva(tk.Toplevel):
         form.pack(padx=30, fill=tk.X)
 
         campos = [
-            ("Hóspede:",    "hospede",   "entry"),
+            ("Email do Hóspede:",    "hospede",   "entry"),
             ("Quarto nº:",  "quarto",    "combo"),
             ("Check-in\n(dd/mm/aaaa):", "checkin",  "entry"),
             ("Check-out\n(dd/mm/aaaa):","checkout", "entry"),
@@ -488,16 +488,24 @@ class JanelaNovaReserva(tk.Toplevel):
         except ValueError:
             messagebox.showerror("Erro", "Datas inválidas ou check-out antes do check-in.", parent=self)
             return
+        
+        client_id = utils.get_client_id_by_email(h)
 
         preco  = ROOMS[q]["preco"]
         total  = preco * noites
         rid    = len(RESERVATIONS) + 1
 
-        RESERVATIONS.append({
+        """RESERVATIONS.append({
             "id": rid, "hospede": h, "quarto": q,
             "checkin": ci, "checkout": co,
-            "noites": noites, "total": total, "estado": "Ativa"
-        })
+            "noites": noites, "total": total, "estado": "active"
+        })"""
+
+
+
+        RESERVATIONS.append(Reservations(rid, client_id, q, ci, co, 'active', total))
+        RESERVATIONS[-1].add_reservation()
+
         ROOMS[q].occupied = 1
 
         messagebox.showinfo("Reserva criada",
@@ -717,8 +725,8 @@ class PaginaRelatorio(tk.Frame):
         tipos = ["Single", "Double", "Suite"]
         cores = [ACCENT, "#555", "#888"]
         for i, (tipo, cor) in enumerate(zip(tipos, cores)):
-            total   = sum(1 for q in ROOMS.values() if q.type == tipo)
-            ocup    = sum(1 for q in ROOMS.values() if q.type == tipo and q.occupied)
+            total   = sum(1 for q in ROOMS if q.type == tipo)
+            ocup    = sum(1 for q in ROOMS if q.type == tipo and q.occupied)
             pct     = (ocup / total * 100) if total else 0
             x0, y0  = 40 + i * 200, 20
             larg, alt = 140, 80

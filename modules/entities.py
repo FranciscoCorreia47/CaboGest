@@ -269,7 +269,7 @@ class Users(People):
 
 
 class Reservations:
-    def __init__(self, id, client_id: int, room_id: int, start_date: datetime, end_date: datetime, status: str, total_price: float):
+    def __init__(self, id, client_id: int, room_id: int, start_date: datetime, end_date: datetime, status: str, total_price: float = 0.0):
         self.__id = id
         self.start_date = start_date
         self.end_date = end_date
@@ -311,13 +311,13 @@ class Reservations:
         except ValueError as e:
             print(e)
             
-    def add_reservation(self, start_date: datetime, end_date: datetime, room: Rooms):
+    def add_reservation(self):
         try:
             con = connection
             curs = cursor
     
             query = "INSERT INTO reservations(client_id, room_id, start_date, end_date) VALUES (%d, %d, %s, %s)"
-            params = (self.__client_id, room.id(), start_date.strftime('%Y-%m-%d %H:%M:%S'), end_date.strftime('%Y-%m-%d %H:%M:%S'))
+            params = (self.__client_id, self.__room_id, self.start_date.strftime('%Y-%m-%d %H:%M:%S'), self.end_date.strftime('%Y-%m-%d %H:%M:%S'))
             curs.execute(query, params)
             con.commit()
     
@@ -360,3 +360,6 @@ class Reservations:
             return user_full_name
         except Exception as e:
             print(f"{e}")
+    
+    def calculate_total(season):
+        pass
