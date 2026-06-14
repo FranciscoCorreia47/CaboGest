@@ -42,22 +42,23 @@ clients_data = utils.get_all('clients')
 reservations_data = utils.get_all('reservations')
 users_data = utils.get_all('users')
 
-ROOMS = list()
-CLIENTS = list()
-RESERVATIONS = list()
-USERS = list()
+ROOMS = {}
+CLIENTS = {}
+RESERVATIONS = []
+USERS = {}
 
 for r in rooms_data:
-  ROOMS.append(Rooms(r[0], r[1], r[2], r[3], r[4], r[5], r[6]))
+    room = Rooms(r[0], r[1], r[2], r[3], r[6], r[4], r[5])
+    ROOMS[room.id] = room
 
 for c in clients_data:
-  CLIENTS.append(Clients(c[0], c[1], c[2], c[3], c[4], c[5]))
+    CLIENTS[c[0]] = Clients(c[0], c[1], c[2], c[3], c[5], c[4])
 
 for rs in reservations_data:
-  RESERVATIONS.append(Reservations(rs[0], rs[1], rs[2], rs[3], rs[4], rs[5]))
+    RESERVATIONS.append(Reservations(rs[0], rs[1], rs[2], rs[3], rs[4], rs[5], rs[6]))
 
 for u in users_data:
-  USERS.append(Users(u[0], u[1], u[2], u[3], u[4], u[5]))
+    USERS[u[0]] = Users(u[0], u[1], u[2], u[3], u[4], u[5])
 
 # ═══════════════════════════════════════════
 #  JANELA PRINCIPAL
@@ -269,6 +270,35 @@ def stat_card(parent, valor, rotulo, cor=TEXT):
     return f
 
 
+def normalize_datetime(value):
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    if isinstance(value, str):
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+    return None
+
+
+def format_date(value):
+    dt = normalize_datetime(value)
+    return dt.strftime("%d/%m/%Y") if dt else str(value)
+
+
+def reservation_guest_name(reservation):
+    name = reservation.client_name()
+    if name and name != "Unknown":
+        return name
+    client = CLIENTS.get(reservation.client_id)
+    if client:
+        return f"{client.f_name} {client.l_name}"
+    return "Desconhecido"
+
+
 # ═══════════════════════════════════════════
 #  PÁGINA: INÍCIO
 # ═══════════════════════════════════════════
@@ -284,10 +314,10 @@ class PaginaInicio(tk.Frame):
         f = tk.Frame(self, bg=BG)
         f.pack(fill=tk.X, padx=24, pady=8)
 
-        disponiveis = sum(1 for q in ROOMS if q.occupied() == 0)
+        disponiveis = sum(1 for q in ROOMS.values() if q.occupied == 0)
         ocupados    = len(ROOMS) - disponiveis
         hoje        = sum(1 for r in RESERVATIONS
-                         if r.start_date == date.today().strftime("%d/%m/%Y"))
+                         if normalize_datetime(r.start_date).date() == date.today())
 
         receita = sum(r.total_price for r in RESERVATIONS)
 
@@ -314,8 +344,8 @@ class PaginaInicio(tk.Frame):
 
         for r in RESERVATIONS[-10:][::-1]:
             tree.insert("", tk.END, values=(
-                r.id(), r.client_name(), r.room_id(),
-                r.start_date, r.end_date, f"{r.total_price}€"
+                r.id, reservation_guest_name(r), r.room_id,
+                format_date(r.start_date), format_date(r.end_date), f"{r.total_price}€"
             ))
 
         sb = ttk.Scrollbar(self, orient=tk.VERTICAL, command=tree.yview)
@@ -370,17 +400,20 @@ class PaginaReservas(tk.Frame):
         lista = dados if dados is not None else RESERVATIONS
         for r in lista:
             tag = "cancelada" if r.status == "canceled" else "ativa"
-            self.tree.insert("", tk.END, iid=r.id(), tags=(tag,), values=(
-                r.id(), r.client_name(), r.room_id(),
-                r.start_date, r.end_date,
-                (r.start_date - r.end_date).days, f"{r.total_price}€",
-                r.status()
+            start_dt = normalize_datetime(r.start_date)
+            end_dt = normalize_datetime(r.end_date)
+            noites = (end_dt - start_dt).days if start_dt and end_dt else 0
+            self.tree.insert("", tk.END, iid=r.id, tags=(tag,), values=(
+                r.id, reservation_guest_name(r), r.room_id,
+                format_date(r.start_date), format_date(r.end_date),
+                noites, f"{r.total_price}€",
+                r.status
             ))
 
     def _filtrar(self):
         q = self.pesq.get().lower()
         filtrado = [r for r in RESERVATIONS
-                    if q in r.client_name().lower() or q in r.room_id]
+                    if q in r.client_name().lower() or q in str(r.room_id)]
         self._carregar(filtrado)
 
     def _ordenar(self, col):
@@ -414,15 +447,16 @@ class PaginaReservas(tk.Frame):
             return
         rid = int(sel)
         for r in RESERVATIONS:
-            if r.id() == rid:
-                if r.status() == "canceled":
+            if r.id == rid:
+                if r.status == "canceled":
                     messagebox.showinfo("Info", "Reserva já cancelada.")
                     return
                 if messagebox.askyesno("Cancelar", f"Cancelar reserva #{rid}?"):
                     r.status = "canceled"
                     # Libertar quarto
-                    if r.room_id in [room.id() for room in ROOMS]:
-                        ROOMS[r.room_id].occupied = 1
+                    room = ROOMS.get(r.room_id)
+                    if room is not None:
+                        room.occupied = 0
                     self._carregar()
                 return
 
@@ -460,8 +494,7 @@ class JanelaNovaReserva(tk.Toplevel):
                          relief="solid", bd=1).grid(row=i, column=1, padx=8, sticky="w")
             else:
                 v = tk.StringVar()
-                disponiveis = [str(n) for n, q in ROOMS
-                               if q.status == "Disponível"]
+                disponiveis = [str(room.id) for room in ROOMS.values() if room.occupied == 0]
                 cb = ttk.Combobox(form, textvariable=v, values=disponiveis,
                                   font=FONT, width=18, state="readonly")
                 cb.grid(row=i, column=1, padx=8, sticky="w")
@@ -490,26 +523,31 @@ class JanelaNovaReserva(tk.Toplevel):
             return
         
         client_id = utils.get_client_id_by_email(h)
+        if client_id is None:
+            messagebox.showerror("Erro", "Cliente não encontrado.", parent=self)
+            return
 
-        preco  = ROOMS[q]["preco"]
+        room = ROOMS.get(q)
+        if room is None or room.occupied == 1:
+            messagebox.showerror("Erro", "Quarto inválido ou indisponível.", parent=self)
+            return
+
+        preco  = room.price_per_night
         total  = preco * noites
-        rid    = len(RESERVATIONS) + 1
 
-        """RESERVATIONS.append({
-            "id": rid, "hospede": h, "quarto": q,
-            "checkin": ci, "checkout": co,
-            "noites": noites, "total": total, "estado": "active"
-        })"""
+        start_dt = datetime.combine(d_in, datetime.min.time())
+        end_dt = datetime.combine(d_out, datetime.min.time())
+        reservation = Reservations(None, client_id, q, start_dt, end_dt, 'active', total)
+        reservation_id = reservation.add_reservation()
+        if reservation_id is None:
+            messagebox.showerror("Erro", "Não foi possível criar a reserva.", parent=self)
+            return
 
-
-
-        RESERVATIONS.append(Reservations(rid, client_id, q, ci, co, 'active', total))
-        RESERVATIONS[-1].add_reservation()
-
-        ROOMS[q].occupied = 1
+        RESERVATIONS.append(reservation)
+        room.occupied = 1
 
         messagebox.showinfo("Reserva criada",
-                            f"Reserva #{rid} criada!\n{noites} noite(s) × {preco}€ = {total}€",
+                            f"Reserva #{reservation_id} criada!\n{noites} noite(s) × {preco}€ = {total}€",
                             parent=self)
         self.callback()
         self.destroy()
@@ -549,9 +587,11 @@ class PaginaQuartos(tk.Frame):
 
     def _carregar(self):
         self.tree.delete(*self.tree.get_children())
-        for num, q in sorted(ROOMS):
-            self.tree.insert("", tk.END, iid=num, tags=(q.occupied,), values=(
-                num, q.type, f"{q.total_price}€", q.occupied
+        for num in sorted(ROOMS):
+            q = ROOMS[num]
+            estado = "Disponível" if q.occupied == 0 else "Ocupado"
+            self.tree.insert("", tk.END, iid=num, tags=(estado,), values=(
+                num, q.type, f"{q.price_per_night}€", estado
             ))
 
     def _editar(self):
@@ -559,7 +599,9 @@ class PaginaQuartos(tk.Frame):
         if not sel:
             messagebox.showwarning("Aviso", "Seleciona um quarto."); return
         num = int(sel)
-        q   = ROOMS[num]
+        q   = ROOMS.get(num)
+        if q is None:
+            messagebox.showerror("Erro", "Quarto não encontrado."); return
         JanelaEditarQuarto(self, num, q, self._carregar)
 
     def _toggle_estado(self):
@@ -567,10 +609,10 @@ class PaginaQuartos(tk.Frame):
         if not sel:
             messagebox.showwarning("Aviso", "Seleciona um quarto."); return
         num = int(sel)
-        estados = ["Disponível", "Ocupado"]
-        atual   = ROOMS[num].occupied
-        prox    = estados[atual]
-        ROOMS[num].occupied = prox
+        room = ROOMS.get(num)
+        if room is None:
+            messagebox.showerror("Erro", "Quarto não encontrado."); return
+        room.occupied = 0 if room.occupied == 1 else 1
         self._carregar()
 
 
@@ -591,12 +633,12 @@ class JanelaEditarQuarto(tk.Toplevel):
         form.pack(padx=24, fill=tk.X)
 
         self.tipo  = tk.StringVar(value=quarto.type)
-        self.preco = tk.StringVar(value=str(quarto.price))
-        self.estado= tk.StringVar(value=quarto.occupied)
+        self.preco = tk.StringVar(value=str(quarto.price_per_night))
+        self.estado= tk.StringVar(value="Disponível" if quarto.occupied == 0 else "Ocupado")
 
         for i, (lbl, var, opts) in enumerate([
             ("Tipo:",  self.tipo,   ["Single", "Double", "Suite"]),
-            ("Estado:",self.estado, ["Disponível", "Ocupado", "Manutenção"]),
+            ("Estado:",self.estado, ["Disponível", "Ocupado"]),
         ]):
             tk.Label(form, text=lbl, font=FONT, bg=BG, width=10, anchor="e").grid(row=i, column=0, pady=6)
             ttk.Combobox(form, textvariable=var, values=opts,
@@ -612,10 +654,15 @@ class JanelaEditarQuarto(tk.Toplevel):
         try:
             p = int(self.preco.get())
         except ValueError:
-            messagebox.showerror("Erro", "Preço inválido.", parent=self); return
-        ROOMS[self.num].type      = self.tipo.get()
-        ROOMS[self.num].price     = p
-        ROOMS[self.num].occupied  = self.estado.get()
+            messagebox.showerror("Erro", "Preço inválido.", parent=self)
+            return
+        room = ROOMS.get(self.num)
+        if room is None:
+            messagebox.showerror("Erro", "Quarto não encontrado.", parent=self)
+            return
+        room.type = self.tipo.get()
+        room.price_per_night = p
+        room.occupied = 0 if self.estado.get() == "Disponível" else 1
         self.callback()
         self.destroy()
 
@@ -673,8 +720,8 @@ class PaginaTarifario(tk.Frame):
                     TARIFS[tipo][epoca] = int(var.get())
                     # Sincronizar preço padrão do quarto
                     for q in ROOMS.values():
-                        if q["tipo"] == tipo:
-                            q["preco"] = TARIFS[tipo]["Média"]
+                        if q.type == tipo:
+                            q.price_per_night = TARIFS[tipo]["Média"]
         except ValueError:
             messagebox.showerror("Erro", "Todos os preços devem ser números inteiros.")
             return
@@ -698,10 +745,10 @@ class PaginaRelatorio(tk.Frame):
         f.pack(fill=tk.X, padx=24, pady=4)
 
         total_res  = len(RESERVATIONS)
-        ativas     = sum(1 for r in RESERVATIONS if r.status != "Canceled")
+        ativas     = sum(1 for r in RESERVATIONS if r.status != "canceled")
         canceladas = total_res - ativas
-        receita    = sum(r.total_price for r in RESERVATIONS if r.status != "Canceled")
-        ocup_pct   = round((sum(1 for q in ROOMS if q.occupied)
+        receita    = sum(r.total_price for r in RESERVATIONS if r.status != "canceled")
+        ocup_pct   = round((sum(1 for q in ROOMS.values() if q.occupied == 1)
                             / len(ROOMS)) * 100) if ROOMS else 0
 
         cards = [
@@ -725,8 +772,8 @@ class PaginaRelatorio(tk.Frame):
         tipos = ["Single", "Double", "Suite"]
         cores = [ACCENT, "#555", "#888"]
         for i, (tipo, cor) in enumerate(zip(tipos, cores)):
-            total   = sum(1 for q in ROOMS if q.type == tipo)
-            ocup    = sum(1 for q in ROOMS if q.type == tipo and q.occupied)
+            total   = sum(1 for q in ROOMS.values() if q.type == tipo)
+            ocup    = sum(1 for q in ROOMS.values() if q.type == tipo and q.occupied == 1)
             pct     = (ocup / total * 100) if total else 0
             x0, y0  = 40 + i * 200, 20
             larg, alt = 140, 80
@@ -743,9 +790,8 @@ class PaginaRelatorio(tk.Frame):
         print("\n" + "="*50)
         print("RELATÓRIO CaboGest —", datetime.now().strftime("%d/%m/%Y %H:%M"))
         print("="*50)
-        for r in ROOMS:
-            est = r.occupied
-            print(f"#{r['id']:03d} | {r['hospede']:<20} | Q{r['quarto']} | "
-                  f"{r['checkin']}→{r['checkout']} | {r.get('total',0)}€ | {est}")
+        for r in RESERVATIONS:
+            print(f"#{r.id:03d} | {r.client_name():<20} | Q{r.room_id} | "
+                  f"{format_date(r.start_date)}→{format_date(r.end_date)} | {r.total_price}€ | {r.status}")
         print("="*50)
         messagebox.showinfo("Exportado", "Relatório exportado para a consola/terminal.")

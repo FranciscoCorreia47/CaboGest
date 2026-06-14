@@ -7,7 +7,7 @@ CREATE TABLE rooms (
   id INT AUTO_INCREMENT,
   bed_qty INT NOT NULL DEFAULT 1,
   category ENUM("regular", "view") NOT NULL DEFAULT "regular",
-  type ENUM("single", "suite") NOT NULL DEFAULT "single",
+  type ENUM("single", "double", "suite") NOT NULL DEFAULT "single",
   occupied TINYINT NOT NULL DEFAULT 0,
   description TINYTEXT,
   price_per_night FLOAT NOT NULL,
