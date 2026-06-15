@@ -355,6 +355,32 @@ class Reservations:
         except Exception as e:
             print(f"{e}")
 
+    def transfer_to_client(self, client_id: int):
+        try:
+            if not isinstance(client_id, int) or client_id <= 0:
+                raise ValueError("Client ID must be a positive integer")
+            if self.__client_id == client_id:
+                return False
+            if self.__status == "canceled":
+                return False
+
+            con = connection
+            curs = connection.cursor()
+
+            query = "UPDATE reservations SET client_id = %s, status = %s WHERE id = %s"
+            params = (client_id, "transfered", self.__id)
+            curs.execute(query, params)
+            con.commit()
+
+            self.__client_id = client_id
+            self.__status = "transfered"
+
+            curs.close()
+            return True
+        except Exception as e:
+            print(f"{e}")
+            return False
+
     def get_client_name(self):
         try:
             con = connection

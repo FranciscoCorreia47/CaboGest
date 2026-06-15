@@ -1,3 +1,4 @@
+import re
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from datetime import date, datetime
@@ -108,6 +109,7 @@ class CaboGest(tk.Tk):
         nav_items = [
             ("🏠", "Inicio",    "inicio"),
             ("📅", "Reservas",  "reservas"),
+            ("👥", "Clientes",  "clientes"),
             ("🛏", "Quartos",   "quartos"),
             ("💲", "Tarifario", "tarifario"),
             ("📊", "Relatório", "relatorio"),
@@ -136,10 +138,14 @@ class CaboGest(tk.Tk):
                          cursor="hand2")
         inner.pack(fill=tk.X)
 
-        lbl = tk.Label(inner, text=f"  {icon}  {label}", font=FONT_B,
+        icon_lbl = tk.Label(inner, text=icon, font=FONT_B,
+                             bg=SIDEBAR, fg=TEXT, cursor="hand2")
+        icon_lbl.pack(side=tk.LEFT, padx=(8, 0), pady=10)
+
+        lbl = tk.Label(inner, text=f"  {label}", font=FONT_B,
                        bg=SIDEBAR, fg=TEXT, anchor="w", padx=8, pady=10,
                        cursor="hand2")
-        lbl.pack(fill=tk.X)
+        lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         def on_click(p=page):
             self._show_page(p)
@@ -153,6 +159,10 @@ class CaboGest(tk.Tk):
                 f.configure(bg=SIDEBAR)
                 l.configure(bg=SIDEBAR, fg=TEXT)
 
+        # Make icon and label react jointly as a single button
+        icon_lbl.bind("<Button-1>", lambda e: on_click())
+        icon_lbl.bind("<Enter>", on_enter)
+        icon_lbl.bind("<Leave>", on_leave)
         inner.bind("<Button-1>", lambda e: on_click())
         lbl.bind("<Button-1>",   lambda e: on_click())
         inner.bind("<Enter>", on_enter)
@@ -163,7 +173,7 @@ class CaboGest(tk.Tk):
         return (inner, lbl)
 
     def _icon_btn(self, parent, symbol, cmd):
-        btn = tk.Label(parent, text=symbol, font=("Helvetica", 14),
+        btn = tk.Label(parent, text=symbol, font=FONT_B,
                        bg=SIDEBAR, fg=TEXT, cursor="hand2",
                        relief="solid", bd=1, width=3, pady=4)
         btn.bind("<Button-1>", lambda e: cmd())
@@ -191,6 +201,7 @@ class CaboGest(tk.Tk):
         pages = {
             "inicio":    PaginaInicio,
             "reservas":  PaginaReservas,
+            "clientes":  PaginaClientes,
             "quartos":   PaginaQuartos,
             "tarifario": PaginaTarifario,
             "relatorio": PaginaRelatorio,
@@ -365,7 +376,9 @@ class PaginaReservas(tk.Frame):
 
         bar = tk.Frame(self, bg=BG)
         bar.pack(fill=tk.X, padx=24, pady=(0, 8))
+        btn_primario(bar, "+ Novo Hóspede", self._novo_cliente).pack(side=tk.LEFT, padx=(0, 8))
         btn_primario(bar, "+ Nova Reserva", self._nova).pack(side=tk.LEFT, padx=(0, 8))
+        btn_primario(bar, "Transferir Selecionada", self._transferir).pack(side=tk.LEFT, padx=(0, 8))
         btn_perigo(bar, "Cancelar Selecionada", self._cancelar).pack(side=tk.LEFT)
 
         # Pesquisa
@@ -437,6 +450,9 @@ class PaginaReservas(tk.Frame):
           
       self._carregar()
 
+    def _novo_cliente(self):
+        JanelaNovoCliente(self, self._carregar)
+
     def _nova(self):
         JanelaNovaReserva(self, self._carregar)
 
@@ -459,6 +475,39 @@ class PaginaReservas(tk.Frame):
                         room.occupied = 0
                     self._carregar()
                 return
+
+    def _transferir(self):
+        sel = self.tree.focus()
+        if not sel:
+            messagebox.showwarning("Aviso", "Seleciona uma reserva primeiro.")
+            return
+
+        rid = int(sel)
+        reserva = next((r for r in RESERVATIONS if r.id == rid), None)
+        if reserva is None:
+            messagebox.showerror("Erro", "Reserva não encontrada.")
+            return
+        if reserva.status == "canceled":
+            messagebox.showwarning("Aviso", "Não é possível transferir uma reserva cancelada.")
+            return
+
+        novo_email = simpledialog.askstring("Transferir Reserva",
+                                           "Email do novo hóspede:", parent=self)
+        if not novo_email:
+            return
+
+        novo_cliente_id = utils.get_client_id_by_email(novo_email.strip())
+        if novo_cliente_id is None:
+            if messagebox.askyesno("Cliente não encontrado",
+                                   "Cliente não encontrado. Deseja cadastrar um novo cliente?", parent=self):
+                JanelaNovoCliente(self, self._carregar, novo_email.strip())
+            return
+
+        if reserva.transfer_to_client(novo_cliente_id):
+            messagebox.showinfo("Transferido", f"Reserva #{rid} transferida para {novo_email.strip()}.")
+            self._carregar()
+        else:
+            messagebox.showerror("Erro", "Não foi possível transferir a reserva.")
 
 
 # ── Janela: Nova Reserva ──────────────────
@@ -524,7 +573,8 @@ class JanelaNovaReserva(tk.Toplevel):
         
         client_id = utils.get_client_id_by_email(h)
         if client_id is None:
-            messagebox.showerror("Erro", "Cliente não encontrado.", parent=self)
+            if messagebox.askyesno("Cliente não encontrado", "Cliente não encontrado. Deseja cadastrar um novo cliente?", parent=self):
+                JanelaNovoCliente(self, self._on_new_client_added, h)
             return
 
         room = ROOMS.get(q)
@@ -551,6 +601,153 @@ class JanelaNovaReserva(tk.Toplevel):
                             parent=self)
         self.callback()
         self.destroy()
+
+    def _on_new_client_added(self, client):
+        if client is None:
+            return
+        self.vars["hospede"].set(client.email)
+        messagebox.showinfo("Cliente Adicionado",
+                            f"Cliente {client.f_name} {client.l_name} foi adicionado. Agora pode criar a reserva.",
+                            parent=self)
+
+
+# ═══════════════════════════════════════════
+#  PÁGINA: CLIENTES
+# ═══════════════════════════════════════════
+class PaginaClientes(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.pack(fill=tk.BOTH, expand=True)
+        titulo(self, "👥  Gestão de Clientes")
+
+        bar = tk.Frame(self, bg=BG)
+        bar.pack(fill=tk.X, padx=24, pady=(0, 8))
+        btn_primario(bar, "+ Novo Cliente", self._novo_cliente).pack(side=tk.LEFT, padx=(0, 8))
+
+        tk.Label(bar, text="Pesquisar:", font=FONT, bg=BG).pack(side=tk.LEFT, padx=(20, 4))
+        self.pesq = tk.StringVar()
+        self.pesq.trace_add("write", lambda *a: self._filtrar())
+        tk.Entry(bar, textvariable=self.pesq, font=FONT, width=22,
+                 relief="solid", bd=1).pack(side=tk.LEFT)
+
+        self._build_tree()
+        self._carregar()
+
+    def _build_tree(self):
+        cols = ("ID", "Nome", "Email", "Nacionalidade", "Nascimento")
+        self.tree = ttk.Treeview(self, columns=cols, show="headings", height=18)
+        widths = [40, 180, 200, 140, 100]
+        for c, w in zip(cols, widths):
+            self.tree.heading(c, text=c)
+            self.tree.column(c, width=w, anchor="center")
+        self.tree.column("Nome", anchor="w")
+
+        sb = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.pack(fill=tk.BOTH, expand=True, padx=24, pady=4)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def _carregar(self, dados=None):
+        self.tree.delete(*self.tree.get_children())
+        lista = dados if dados is not None else list(CLIENTS.values())
+        for client in sorted(lista, key=lambda c: c.id):
+            self.tree.insert("", tk.END, iid=client.id, values=(
+                client.id,
+                f"{client.f_name} {client.l_name}",
+                client.email,
+                client.nationality,
+                format_date(client.birth_date)
+            ))
+
+    def _filtrar(self):
+        q = self.pesq.get().lower()
+        filtrado = [c for c in CLIENTS.values()
+                    if q in c.f_name.lower() or q in c.l_name.lower() or q in c.email.lower() or q in c.nationality.lower()]
+        self._carregar(filtrado)
+
+    def _novo_cliente(self):
+        JanelaNovoCliente(self, self._carregar)
+
+
+class JanelaNovoCliente(tk.Toplevel):
+    def __init__(self, parent, callback, email_hint=None):
+        super().__init__(parent)
+        self.callback = callback
+        self.title("Novo Cliente")
+        self.geometry("420x320")
+        self.resizable(False, False)
+        self.configure(bg=BG)
+        self.grab_set()
+
+        tk.Label(self, text="Cadastro de Cliente", font=FONT_H, bg=BG).pack(pady=14)
+
+        form = tk.Frame(self, bg=BG)
+        form.pack(padx=30, fill=tk.X)
+
+        campos = [
+            ("Nome:", "nome"),
+            ("Sobrenome:", "sobrenome"),
+            ("Email:", "email"),
+            ("Nacionalidade:", "nacionalidade"),
+            ("Nascimento (dd/mm/aaaa):", "birth_date"),
+        ]
+
+        self.vars = {}
+        for i, (label, key) in enumerate(campos):
+            tk.Label(form, text=label, font=FONT, bg=BG, anchor="e",
+                     width=18).grid(row=i, column=0, pady=6, sticky="e")
+            v = tk.StringVar()
+            tk.Entry(form, textvariable=v, font=FONT, width=22,
+                     relief="solid", bd=1).grid(row=i, column=1, padx=8, sticky="w")
+            self.vars[key] = v
+
+        if email_hint:
+            self.vars["email"].set(email_hint)
+
+        btn_primario(self, "✔  Guardar Cliente", self._guardar).pack(pady=16)
+
+    def _validar_email(self, email):
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.fullmatch(pattern, email))
+
+    def _guardar(self):
+        nome = self.vars["nome"].get().strip()
+        sobrenome = self.vars["sobrenome"].get().strip()
+        email = self.vars["email"].get().strip()
+        nacionalidade = self.vars["nacionalidade"].get().strip()
+        nascimento = self.vars["birth_date"].get().strip()
+
+        if not all([nome, sobrenome, email, nacionalidade, nascimento]):
+            messagebox.showwarning("Campos em falta", "Preenche todos os campos.", parent=self)
+            return
+        if not self._validar_email(email):
+            messagebox.showerror("Erro", "Email inválido.", parent=self)
+            return
+        try:
+            nascimento_dt = datetime.strptime(nascimento, "%d/%m/%Y").date()
+        except ValueError:
+            messagebox.showerror("Erro", "Data de nascimento inválida.", parent=self)
+            return
+
+        existing_id = utils.get_client_id_by_email(email)
+        if existing_id is not None:
+            messagebox.showwarning("Já existente", "Já existe um cliente com esse email.", parent=self)
+            return
+
+        try:
+            client = Clients(None, nome, sobrenome, email, nacionalidade, nascimento_dt)
+            if not client.id:
+                raise ValueError("Não foi possível obter o ID do cliente.")
+            CLIENTS[client.id] = client
+            messagebox.showinfo("Cliente adicionado", f"Cliente {nome} {sobrenome} adicionado com sucesso.", parent=self)
+            try:
+                self.callback(client)
+            except TypeError:
+                self.callback()
+            self.destroy()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Não foi possível adicionar o cliente.\n{e}", parent=self)
+            return
 
 
 # ═══════════════════════════════════════════
