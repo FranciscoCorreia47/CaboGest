@@ -66,6 +66,7 @@ for u in users_data:
 # ═══════════════════════════════════════════
 class CaboGest(tk.Tk):
     def __init__(self):
+        """Initialize the object and set up its starting values."""
         super().__init__()
         self.title("CaboGest")
         self.geometry("900x580")
@@ -78,6 +79,7 @@ class CaboGest(tk.Tk):
 
     # ── Layout principal ──────────────────
     def _build_layout(self):
+        """Create the main window layout and the content area."""
         # Sidebar
         self.sidebar = tk.Frame(self, bg=SIDEBAR, bd=0,
                                 highlightbackground=BORDER,
@@ -94,6 +96,7 @@ class CaboGest(tk.Tk):
         self._build_sidebar()
 
     def _build_sidebar(self):
+        """Create the sidebar area with logo, navigation, and footer buttons."""
         # Logo
         logo_f = tk.Frame(self.sidebar, bg=SIDEBAR, pady=16)
         logo_f.pack(fill=tk.X)
@@ -130,6 +133,7 @@ class CaboGest(tk.Tk):
         self._icon_btn(bot, "?", self._abrir_ajuda).pack(side=tk.LEFT, padx=8)
 
     def _nav_button(self, parent, icon, label, page):
+        """Create one sidebar navigation button with hover and click actions."""
         frame = tk.Frame(parent, bg=SIDEBAR, cursor="hand2")
         frame.pack(fill=tk.X, padx=12, pady=3)
 
@@ -148,13 +152,16 @@ class CaboGest(tk.Tk):
         lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         def on_click(p=page):
+            """Run the sidebar action for this page and show its content."""
             self._show_page(p)
 
         def on_enter(e, f=inner, l=lbl):
+            """Highlight the button when the mouse pointer enters it."""
             f.configure(bg=ACCENT)
             l.configure(bg=ACCENT, fg=BTN_TXT)
 
         def on_leave(e, f=inner, l=lbl, p=page):
+            """Return the button to normal style when the mouse leaves it."""
             if self._active != p:
                 f.configure(bg=SIDEBAR)
                 l.configure(bg=SIDEBAR, fg=TEXT)
@@ -173,6 +180,7 @@ class CaboGest(tk.Tk):
         return (inner, lbl)
 
     def _icon_btn(self, parent, symbol, cmd):
+        """Create a small icon button for the sidebar footer."""
         btn = tk.Label(parent, text=symbol, font=FONT_B,
                        bg=SIDEBAR, fg=TEXT, cursor="hand2",
                        relief="solid", bd=1, width=3, pady=4)
@@ -183,6 +191,7 @@ class CaboGest(tk.Tk):
 
     # ── Navegação ─────────────────────────
     def _show_page(self, name):
+        """Switch the main content area to the requested page."""
         self._active = name
 
         # Reset todos os botões
@@ -211,6 +220,7 @@ class CaboGest(tk.Tk):
 
     # ── Diálogos especiais ─────────────────
     def _abrir_config(self):
+        """Open a simple configuration dialog window."""
         w = tk.Toplevel(self)
         w.title("Configurações")
         w.geometry("340x200")
@@ -227,6 +237,7 @@ class CaboGest(tk.Tk):
                   ).pack(pady=10)
 
     def _abrir_ajuda(self):
+        """Show the help dialog with basic instructions."""
         msg = (
             "CaboGest — Sistema de Gestão Hoteleira\n\n"
             "• Inicio: painel de resumo\n"
@@ -243,12 +254,14 @@ class CaboGest(tk.Tk):
 #  HELPERS REUTILIZÁVEIS
 # ═══════════════════════════════════════════
 def titulo(parent, texto):
+    """Display a section title and separator line on the page."""
     tk.Label(parent, text=texto, font=FONT_T, bg=BG, fg=TEXT,
              anchor="w").pack(fill=tk.X, padx=24, pady=(20, 4))
     tk.Frame(parent, bg=BORDER, height=2).pack(fill=tk.X, padx=24, pady=(0, 16))
 
 
 def btn_primario(parent, texto, cmd, **kw):
+    """Create a primary action button with hover styling."""
     b = tk.Button(parent, text=texto, font=FONT_B, bg=ACCENT, fg=BTN_TXT,
                   relief="flat", padx=14, pady=7, cursor="hand2",
                   activebackground=BTN_HVR, activeforeground=BTN_TXT,
@@ -259,6 +272,7 @@ def btn_primario(parent, texto, cmd, **kw):
 
 
 def btn_perigo(parent, texto, cmd, **kw):
+    """Create a red danger button for destructive actions."""
     b = tk.Button(parent, text=texto, font=FONT_B, bg=RED, fg=BTN_TXT,
                   relief="flat", padx=14, pady=7, cursor="hand2",
                   activebackground="#8B0000", activeforeground=BTN_TXT,
@@ -267,12 +281,14 @@ def btn_perigo(parent, texto, cmd, **kw):
 
 
 def card(parent, **kw):
+    """Create a simple framed container for grouping widgets."""
     return tk.Frame(parent, bg=BG, bd=1,
                     highlightbackground="#CCCCCC",
                     highlightthickness=1, **kw)
 
 
 def stat_card(parent, valor, rotulo, cor=TEXT):
+    """Create a small statistics card with value, label and color."""
     f = card(parent, padx=16, pady=12)
     tk.Label(f, text=str(valor), font=("Helvetica", 26, "bold"),
              bg=BG, fg=cor).pack()
@@ -282,6 +298,7 @@ def stat_card(parent, valor, rotulo, cor=TEXT):
 
 
 def normalize_datetime(value):
+    """Convert a date or text value into a datetime object if possible."""
     if isinstance(value, datetime):
         return value
     if isinstance(value, date):
@@ -296,11 +313,13 @@ def normalize_datetime(value):
 
 
 def format_date(value):
+    """Format a date or datetime value as a human-readable string."""
     dt = normalize_datetime(value)
     return dt.strftime("%d/%m/%Y") if dt else str(value)
 
 
 def reservation_guest_name(reservation):
+    """Return the guest name for a reservation, using the reservation data."""
     name = reservation.client_name()
     if name and name != "Unknown":
         return name
@@ -315,6 +334,7 @@ def reservation_guest_name(reservation):
 # ═══════════════════════════════════════════
 class PaginaInicio(tk.Frame):
     def __init__(self, parent):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent, bg=BG)
         self.pack(fill=tk.BOTH, expand=True)
         titulo(self, "🏠  Painel de Início")
@@ -322,6 +342,7 @@ class PaginaInicio(tk.Frame):
         self._proximas()
 
     def _stats(self):
+        """Calculate and display summary statistics on the page."""
         f = tk.Frame(self, bg=BG)
         f.pack(fill=tk.X, padx=24, pady=8)
 
@@ -343,6 +364,7 @@ class PaginaInicio(tk.Frame):
             s.pack(side=tk.LEFT, padx=6, pady=4, fill=tk.X, expand=True)
 
     def _proximas(self):
+        """Show the most recent reservations in a list."""
         tk.Label(self, text="Reservas Recentes", font=FONT_B,
                  bg=BG, fg=TEXT2, anchor="w").pack(fill=tk.X, padx=24, pady=(12, 4))
 
@@ -370,6 +392,7 @@ class PaginaInicio(tk.Frame):
 # ═══════════════════════════════════════════
 class PaginaReservas(tk.Frame):
     def __init__(self, parent):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent, bg=BG)
         self.pack(fill=tk.BOTH, expand=True)
         titulo(self, "📅  Gestão de Reservas")
@@ -392,6 +415,7 @@ class PaginaReservas(tk.Frame):
         self._carregar()
 
     def _build_tree(self):
+        """Create the table view and its columns for this page."""
         cols = ("ID", "Hóspede", "Quarto", "Check-in", "Check-out", "Noites", "Total", "Estado")
         self.tree = ttk.Treeview(self, columns=cols, show="headings", height=16)
         widths = [40, 160, 70, 90, 90, 60, 70, 90]
@@ -409,6 +433,7 @@ class PaginaReservas(tk.Frame):
         self.tree.tag_configure("cancelada", background="#FFEBEE", foreground="#999")
 
     def _carregar(self, dados=None):
+        """Load the current records into the table display."""
         self.tree.delete(*self.tree.get_children())
         lista = dados if dados is not None else RESERVATIONS
         for r in lista:
@@ -424,14 +449,16 @@ class PaginaReservas(tk.Frame):
             ))
 
     def _filtrar(self):
+        """Filter the displayed records using the search text."""
         q = self.pesq.get().lower()
         filtrado = [r for r in RESERVATIONS
                     if q in r.client_name().lower() or q in str(r.room_id)]
         self._carregar(filtrado)
 
     def _ordenar(self, col):
-      # Map the column names directly to a lambda function that reads the object
-      key_map = {
+        """Sort the records shown in the table by the selected column."""
+        # Map the column names directly to a lambda function that reads the object
+        key_map = {
           "ID": lambda r: r.id,
           "Hóspede": lambda r: r.get_client_name() or "",
           "Quarto": lambda r: r.room_id,
@@ -439,24 +466,27 @@ class PaginaReservas(tk.Frame):
           "Total": lambda r: r.total_price
       }
       
-      # Fallback to getattr if the column isn't in the map (uses lowercase attribute name)
-      sort_key = key_map.get(col, lambda r: getattr(r, col.lower(), ""))
+        # Fallback to getattr if the column isn't in the map (uses lowercase attribute name)
+        sort_key = key_map.get(col, lambda r: getattr(r, col.lower(), ""))
       
-      try:
+        try:
           # Sort the list in place using the extracted key function
           RESERVATIONS.sort(key=sort_key)
-      except Exception as e:
+        except Exception as e:
           print(f"Sorting error: {e}") # Temporarily print error for debugging
           
-      self._carregar()
+        self._carregar()
 
     def _novo_cliente(self):
+        """Open the window to add a new client."""
         JanelaNovoCliente(self, self._carregar)
 
     def _nova(self):
+        """Open the window to create a new reservation."""
         JanelaNovaReserva(self, self._carregar)
 
     def _cancelar(self):
+        """Cancel the currently selected reservation."""
         sel = self.tree.focus()
         if not sel:
             messagebox.showwarning("Aviso", "Seleciona uma reserva primeiro.")
@@ -477,6 +507,7 @@ class PaginaReservas(tk.Frame):
                 return
 
     def _transferir(self):
+        """Transfer the currently selected reservation to another client."""
         sel = self.tree.focus()
         if not sel:
             messagebox.showwarning("Aviso", "Seleciona uma reserva primeiro.")
@@ -513,6 +544,7 @@ class PaginaReservas(tk.Frame):
 # ── Janela: Nova Reserva ──────────────────
 class JanelaNovaReserva(tk.Toplevel):
     def __init__(self, parent, callback):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent)
         self.callback = callback
         self.title("Nova Reserva")
@@ -552,6 +584,7 @@ class JanelaNovaReserva(tk.Toplevel):
         btn_primario(self, "✔  Confirmar Reserva", self._confirmar).pack(pady=18)
 
     def _confirmar(self):
+        """Validate the form data and create the reservation."""
         h  = self.vars["hospede"].get().strip()
         q  = self.vars["quarto"].get().strip()
         ci = self.vars["checkin"].get().strip()
@@ -603,6 +636,7 @@ class JanelaNovaReserva(tk.Toplevel):
         self.destroy()
 
     def _on_new_client_added(self, client):
+        """Handle the new client created during reservation flow."""
         if client is None:
             return
         self.vars["hospede"].set(client.email)
@@ -616,6 +650,7 @@ class JanelaNovaReserva(tk.Toplevel):
 # ═══════════════════════════════════════════
 class PaginaClientes(tk.Frame):
     def __init__(self, parent):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent, bg=BG)
         self.pack(fill=tk.BOTH, expand=True)
         titulo(self, "👥  Gestão de Clientes")
@@ -634,6 +669,7 @@ class PaginaClientes(tk.Frame):
         self._carregar()
 
     def _build_tree(self):
+        """Create the table view and its columns for this page."""
         cols = ("ID", "Nome", "Email", "Nacionalidade", "Nascimento")
         self.tree = ttk.Treeview(self, columns=cols, show="headings", height=18)
         widths = [40, 180, 200, 140, 100]
@@ -648,6 +684,7 @@ class PaginaClientes(tk.Frame):
         sb.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _carregar(self, dados=None):
+        """Load the current records into the table display."""
         self.tree.delete(*self.tree.get_children())
         lista = dados if dados is not None else list(CLIENTS.values())
         for client in sorted(lista, key=lambda c: c.id):
@@ -660,17 +697,20 @@ class PaginaClientes(tk.Frame):
             ))
 
     def _filtrar(self):
+        """Filter the displayed records using the search text."""
         q = self.pesq.get().lower()
         filtrado = [c for c in CLIENTS.values()
                     if q in c.f_name.lower() or q in c.l_name.lower() or q in c.email.lower() or q in c.nationality.lower()]
         self._carregar(filtrado)
 
     def _novo_cliente(self):
+        """Open the window to add a new client."""
         JanelaNovoCliente(self, self._carregar)
 
 
 class JanelaNovoCliente(tk.Toplevel):
     def __init__(self, parent, callback, email_hint=None):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent)
         self.callback = callback
         self.title("Novo Cliente")
@@ -707,10 +747,12 @@ class JanelaNovoCliente(tk.Toplevel):
         btn_primario(self, "✔  Guardar Cliente", self._guardar).pack(pady=16)
 
     def _validar_email(self, email):
+        """Check that the provided email text matches a valid pattern."""
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return bool(re.fullmatch(pattern, email))
 
     def _guardar(self):
+        """Validate the form inputs and save the current data."""
         nome = self.vars["nome"].get().strip()
         sobrenome = self.vars["sobrenome"].get().strip()
         email = self.vars["email"].get().strip()
@@ -755,6 +797,7 @@ class JanelaNovoCliente(tk.Toplevel):
 # ═══════════════════════════════════════════
 class PaginaQuartos(tk.Frame):
     def __init__(self, parent):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent, bg=BG)
         self.pack(fill=tk.BOTH, expand=True)
         titulo(self, "🛏  Gestão de Quartos")
@@ -768,6 +811,7 @@ class PaginaQuartos(tk.Frame):
         self._carregar()
 
     def _build_tree(self):
+        """Create the table view and its columns for this page."""
         cols = ("Nº", "Tipo", "Preço/noite", "Estado")
         self.tree = ttk.Treeview(self, columns=cols, show="headings", height=18)
         for c in cols:
@@ -783,6 +827,7 @@ class PaginaQuartos(tk.Frame):
         self.tree.tag_configure("Manutenção", background="#FFF8E1", foreground=ORANGE)
 
     def _carregar(self):
+        """Load the current records into the table display."""
         self.tree.delete(*self.tree.get_children())
         for num in sorted(ROOMS):
             q = ROOMS[num]
@@ -792,6 +837,7 @@ class PaginaQuartos(tk.Frame):
             ))
 
     def _editar(self):
+        """Open the selected room for editing."""
         sel = self.tree.focus()
         if not sel:
             messagebox.showwarning("Aviso", "Seleciona um quarto."); return
@@ -802,6 +848,7 @@ class PaginaQuartos(tk.Frame):
         JanelaEditarQuarto(self, num, q, self._carregar)
 
     def _toggle_estado(self):
+        """Switch the selected room between occupied and available."""
         sel = self.tree.focus()
         if not sel:
             messagebox.showwarning("Aviso", "Seleciona um quarto."); return
@@ -815,6 +862,7 @@ class PaginaQuartos(tk.Frame):
 
 class JanelaEditarQuarto(tk.Toplevel):
     def __init__(self, parent, num, quarto: Rooms, callback):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent)
         self.callback = callback
         self.num      = num
@@ -848,6 +896,7 @@ class JanelaEditarQuarto(tk.Toplevel):
         btn_primario(self, "Guardar", self._guardar).pack(pady=14)
 
     def _guardar(self):
+        """Validate the form inputs and save the current data."""
         try:
             p = int(self.preco.get())
         except ValueError:
@@ -869,12 +918,14 @@ class JanelaEditarQuarto(tk.Toplevel):
 # ═══════════════════════════════════════════
 class PaginaTarifario(tk.Frame):
     def __init__(self, parent):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent, bg=BG)
         self.pack(fill=tk.BOTH, expand=True)
         titulo(self, "💲  Tarifário por Temporada")
         self._build()
 
     def _build(self):
+        """Create the widgets needed for this page section."""
         # Tabela visual
         header = tk.Frame(self, bg=ACCENT)
         header.pack(fill=tk.X, padx=24, pady=(0, 1))
@@ -911,6 +962,7 @@ class PaginaTarifario(tk.Frame):
                  font=("Helvetica", 9), bg=BG, fg=TEXT2).pack(padx=24, pady=8, anchor="w")
 
     def _guardar(self):
+        """Validate the form inputs and save the current data."""
         try:
             for tipo, epocas in self.linhas.items():
                 for epoca, var in epocas.items():
@@ -930,6 +982,7 @@ class PaginaTarifario(tk.Frame):
 # ═══════════════════════════════════════════
 class PaginaRelatorio(tk.Frame):
     def __init__(self, parent):
+        """Initialize the object and set up its starting values."""
         super().__init__(parent, bg=BG)
         self.pack(fill=tk.BOTH, expand=True)
         titulo(self, "📊  Relatório de Ocupação")
@@ -938,6 +991,7 @@ class PaginaRelatorio(tk.Frame):
         btn_primario(self, "📋  Exportar (consola)", self._exportar).pack(padx=24, anchor="w", pady=8)
 
     def _stats(self):
+        """Calculate and display summary statistics on the page."""
         f = tk.Frame(self, bg=BG)
         f.pack(fill=tk.X, padx=24, pady=4)
 
@@ -960,6 +1014,7 @@ class PaginaRelatorio(tk.Frame):
             s.pack(side=tk.LEFT, padx=4, pady=4, fill=tk.X, expand=True)
 
     def _grafico(self):
+        """Draw the simple occupancy chart on the report page."""
         tk.Label(self, text="Ocupação por tipo de quarto", font=FONT_B,
                  bg=BG, fg=TEXT2, anchor="w").pack(fill=tk.X, padx=24, pady=(12, 4))
 
@@ -984,6 +1039,7 @@ class PaginaRelatorio(tk.Frame):
                                text=f"{round(pct)}%", font=("Helvetica", 9, "bold"), fill=TEXT)
 
     def _exportar(self):
+        """Export the report data to the terminal and show confirmation."""
         print("\n" + "="*50)
         print("RELATÓRIO CaboGest —", datetime.now().strftime("%d/%m/%Y %H:%M"))
         print("="*50)

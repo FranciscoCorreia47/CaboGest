@@ -12,6 +12,7 @@ RESERVATION_STATUSES = [
 
 
 def normalize_reservation_status(status: str):
+    """Make sure a reservation status is valid and return it in a standard form."""
     if not isinstance(status, str):
         return "checked_in"
     normalized = status.strip().lower()
@@ -22,6 +23,7 @@ def normalize_reservation_status(status: str):
 
 class Rooms:
     def __init__(self, id, bed_qty: int, category, type, price_per_night: float = 0.0, occupied: int = 0, description = None):
+        """Initialize the object and set up its starting values."""
         self.__id = id
         self.__bed_qty = bed_qty
         self.__category = category
@@ -40,6 +42,7 @@ class Rooms:
 
     @category.setter
     def category(self, value):
+        """Validate the room category and update it in the database."""
         try:
             if value not in ["Regular", "With View"]:
                 raise ValueError(f"Room Category can only be 'Regular' or 'With View', got {value}")
@@ -63,6 +66,7 @@ class Rooms:
 
     @type.setter
     def type(self, value):
+        """Validate the room type and update it in the database."""
         try:
             if value not in ["Suite", "Single", "Double"]:
                 raise ValueError(f"Room Type can only be 'Suite', 'Single' or 'Double', got {value}")
@@ -86,6 +90,7 @@ class Rooms:
 
     @occupied.setter
     def occupied(self, status: int):
+        """Validate the occupied state and save it in the database."""
         try:
             if status not in (0, 1):
                 raise ValueError(f"Room Status can only be 0 for free or 1 for occupied, got {status}")
@@ -109,6 +114,7 @@ class Rooms:
 
     @bed_qty.setter
     def bed_qty(self, qnty):
+        """Validate the room bed quantity and update the room record."""
         try:
             if not isinstance(qnty, int) or qnty <= 0:
                 raise ValueError("Bed quantity must be a number and greater than 0")
@@ -127,6 +133,7 @@ class Rooms:
             print(e)
 
     def add_room(self):
+        """Save this room information into the database."""
         try:
             con = connection
             curs = connection.cursor()
@@ -144,6 +151,7 @@ class Rooms:
 
 class People:
     def __init__(self, id, f_name, l_name, email):
+        """Initialize the object and set up its starting values."""
         self.__id = id
         self._f_name = f_name
         self._l_name = l_name
@@ -159,6 +167,7 @@ class People:
 
     @f_name.setter
     def f_name(self, name, table: str):
+        """Validate the first name and update it in the database."""
         try:
             if len(name) > 16:
                 raise ValueError("The first name must have a maximum of 16 characters")
@@ -182,6 +191,7 @@ class People:
 
     @l_name.setter
     def l_name(self, name, table: str):
+        """Validate the last name and update it in the database."""
         try:
             if len(name) > 16:
                 raise ValueError("The last name must have a maximum of 16 characters")
@@ -205,6 +215,7 @@ class People:
 
     @email.setter
     def email(self, value, table: str):
+        """Validate the email format and save it to the database."""
         try:
             pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
             if not re.fullmatch(pattern, value):
@@ -226,6 +237,7 @@ class People:
 
 class Clients(People):
     def __init__(self, id, f_name, l_name, email, nationality, birth_date):
+        """Initialize the object and set up its starting values."""
         super().__init__(id, f_name, l_name, email)
         self.nationality = nationality
         self.birth_date = birth_date
@@ -233,6 +245,7 @@ class Clients(People):
             self.add_client()
 
     def add_client(self):
+        """Create a new client record in the database."""
         try:
             con = connection
             curs = connection.cursor()
@@ -252,11 +265,13 @@ class Clients(People):
 
 class Users(People):
     def __init__(self, id, f_name, l_name, email, password, role):
+        """Initialize the object and set up its starting values."""
         super().__init__(id, f_name, l_name, email)
         self.__password = password
         self.role = role
 
     def add_user(self):
+        """Create a new user record in the database."""
         try:
             con = connection
             curs = connection.cursor()
@@ -274,6 +289,7 @@ class Users(People):
 
 class Reservations:
     def __init__(self, id, client_id: int, room_id: int, start_date: datetime, end_date: datetime, status: str, total_price: float = 0.0):
+        """Initialize the object and set up its starting values."""
         self.__id = id
         self.start_date = start_date
         self.end_date = end_date
@@ -296,21 +312,22 @@ class Reservations:
     
     @status.setter
     def status(self, status: str):
+        """Normalize and update the reservation status in the database."""
         normalized = normalize_reservation_status(status)
         try:
             if normalized not in RESERVATION_STATUSES:
                 raise ValueError(f"Reservation Status can only be {RESERVATION_STATUSES}, got {status}")
             self.__status = normalized
-    
+
             query = "UPDATE reservations SET status = %s WHERE id = %s"
             params = (self.__status, self.__id)
 
             con = connection
             curs = connection.cursor()
-    
+
             curs.execute(query, params)
             con.commit()
-    
+
             curs.close()
         except ValueError as e:
             print(e)
@@ -320,6 +337,7 @@ class Reservations:
         return self.__client_id
 
     def add_reservation(self):
+        """Save a new reservation in the database and return its ID."""
         try:
             con = connection
             curs = connection.cursor()
@@ -342,6 +360,7 @@ class Reservations:
             return None
 
     def update_reservation(self, status: str):
+        """Change the status of this reservation in the database."""
         try:
             con = connection
             curs = connection.cursor()
@@ -356,6 +375,7 @@ class Reservations:
             print(f"{e}")
 
     def transfer_to_client(self, client_id: int):
+        """Transfer this reservation to another client and update its status."""
         try:
             if not isinstance(client_id, int) or client_id <= 0:
                 raise ValueError("Client ID must be a positive integer")
@@ -382,6 +402,7 @@ class Reservations:
             return False
 
     def get_client_name(self):
+        """Return the full client name for this reservation from the database."""
         try:
             con = connection
             curs = connection.cursor()
@@ -403,7 +424,9 @@ class Reservations:
             return "Unknown"
 
     def client_name(self):
+        """Return the client name for this reservation."""
         return self.get_client_name()
 
     def calculate_total(self, season):
+        """Calculate the total price for this reservation based on the selected season."""
         pass
